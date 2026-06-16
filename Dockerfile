@@ -14,6 +14,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json next.config.mjs ./
 COPY app ./app
+COPY lib ./lib
 COPY public ./public
 
 RUN npm run build
@@ -33,6 +34,7 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=dependencies --chown=nextjs:nodejs /app/node_modules/text-to-svg/build/fonts ./node_modules/text-to-svg/build/fonts
 
 USER nextjs
 

@@ -1,0 +1,286 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Locale {
+  no
+  pl
+  en
+}
+
+enum ProductStatus {
+  draft
+  active
+  hidden
+}
+
+enum PersonalizationFieldType {
+  text
+  long_text
+  date
+  number
+  file
+}
+
+enum OrderStatus {
+  new
+  awaiting_payment
+  paid
+  needs_review
+  in_production
+  ready_to_ship
+  shipped
+  completed
+  cancelled
+  complaint
+}
+
+enum PaymentStatus {
+  pending
+  succeeded
+  failed
+  expired
+  refunded
+  cancelled
+}
+
+enum ConsentType {
+  terms
+  privacy
+  personalized_no_standard_return
+  marketing
+  cookies
+}
+
+enum AdminRole {
+  admin
+  manager
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  slug      String    @unique
+  sortOrder Int       @default(0)
+  active    Boolean   @default(true)
+  products  Product[]
+  translations CategoryTranslation[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model CategoryTranslation {
+  id         String   @id @default(cuid())
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  locale     Locale
+  title      String
+  eyebrow    String?
+  copy       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([categoryId, locale])
+}
+
+model Product {
+  id                 String                 @id @default(cuid())
+  slug               String                 @unique
+  categoryId         String
+  category           Category               @relation(fields: [categoryId], references: [id])
+  templateId         String?
+  template           ProductTemplate?       @relation(fields: [templateId], references: [id])
+  status             ProductStatus          @default(draft)
+  basePriceNokGross  Int
+  currency           String                 @default("NOK")
+  imageUrl           String?
+  leadTimeLabel      String?
+  isPersonalized     Boolean                @default(true)
+  requiresDimensions Boolean                @default(false)
+  requiresFile       Boolean                @default(false)
+  allowsExpress      Boolean                @default(true)
+  allowsGiftWrap     Boolean                @default(true)
+  translations       ProductTranslation[]
+  fields             PersonalizationField[]
+  orderItems         OrderItem[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+}
+
+model ProductTranslation {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale      Locale
+  name        String
+  shortCopy   String
+  fullCopy    String?
+  tag         String?
+  delivery    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, locale])
+}
+
+model ProductTemplate {
+  id              String    @id @default(cuid())
+  slug            String
+  version         String
+  canvasWidthMm   Float
+  canvasHeightMm  Float
+  rendererConfig  Json
+  fontId          String
+  fontVersion     String
+  active          Boolean   @default(true)
+  products        Product[]
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([slug, version])
+}
+
+model PersonalizationField {
+  id          String                   @id @default(cuid())
+  productId   String
+  product     Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  key         String
+  type        PersonalizationFieldType
+  required    Boolean                  @default(true)
+  maxChars    Int?
+  previewKey  String?
+  sortOrder   Int                      @default(0)
+  config      Json?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  @@unique([productId, key])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  phone     String?
+  name      String?
+  orders    Order[]
+  consents  ConsentRecord[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Order {
+  id               String          @id @default(cuid())
+  orderNo          String          @unique
+  customerId       String?
+  customer         Customer?       @relation(fields: [customerId], references: [id])
+  email            String
+  phone            String?
+  locale           Locale          @default(no)
+  status           OrderStatus     @default(new)
+  currency         String          @default("NOK")
+  subtotalGrossNok Int
+  mvaNok           Int
+  totalGrossNok    Int
+  deliverySnapshot Json?
+  items            OrderItem[]
+  payments         Payment[]
+  invoices         Invoice[]
+  consents         ConsentRecord[]
+  auditLogs        AuditLog[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model OrderItem {
+  id                      String   @id @default(cuid())
+  orderId                 String
+  order                   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId               String?
+  product                 Product? @relation(fields: [productId], references: [id])
+  productSnapshot         Json
+  personalizationSnapshot Json
+  priceSnapshot           Json
+  quantity                Int      @default(1)
+  templateVersion         String?
+  fontVersion             String?
+  productionSvgRef        String?
+  previewPngRef           String?
+  svgHash                 String?
+  requiresReview          Boolean  @default(false)
+  reviewReason            String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  orderId            String
+  order              Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  provider           String
+  providerSessionId  String?       @unique
+  providerPaymentId  String?       @unique
+  status             PaymentStatus @default(pending)
+  amountGrossNok     Int
+  idempotencyKey     String?       @unique
+  rawEvent           Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+model ConsentRecord {
+  id               String      @id @default(cuid())
+  customerId        String?
+  customer          Customer?   @relation(fields: [customerId], references: [id])
+  orderId           String?
+  order             Order?      @relation(fields: [orderId], references: [id])
+  type              ConsentType
+  documentVersion   String
+  textSnapshot      String
+  accepted          Boolean
+  source            String
+  ipAddress         String?
+  userAgent         String?
+  withdrawnAt       DateTime?
+  createdAt         DateTime    @default(now())
+}
+
+model Invoice {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  invoiceNo      String   @unique
+  orgNo          String   @default("925 621 102")
+  amountGrossNok Int
+  mvaNok         Int
+  storageRef     String?
+  issuedAt       DateTime @default(now())
+  createdAt      DateTime @default(now())
+}
+
+model AdminUser {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  role         AdminRole  @default(manager)
+  active       Boolean    @default(true)
+  auditLogs    AuditLog[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  orderId     String?
+  order       Order?     @relation(fields: [orderId], references: [id])
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id])
+  action      String
+  before      Json?
+  after       Json?
+  ipAddress   String?
+  createdAt   DateTime   @default(now())
+}

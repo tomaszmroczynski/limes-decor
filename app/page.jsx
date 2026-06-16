@@ -1,62 +1,15 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const categories = [
-  {
-    id: "sluby",
-    eyebrow: "KOLEKCJA",
-    title: "Śluby",
-    copy: "Pamiątki, pudełka i detale stworzone dla jednej, wyjątkowej historii.",
-    image: "/images/album-hero.png",
-  },
-  {
-    id: "urodziny",
-    eyebrow: "KOLEKCJA",
-    title: "Urodziny",
-    copy: "Osobiste prezenty, które zachowują wspomnienia na dłużej.",
-    image: "/images/gift-box.jpg",
-  },
-  {
-    id: "wielkanoc",
-    eyebrow: "KOLEKCJA SEZONOWA",
-    title: "Wielkanoc",
-    copy: "Naturalne dekoracje stołu i domu z imieniem lub własną dedykacją.",
-    image: "/images/album-side.jpg",
-  },
-  {
-    id: "boze-narodzenie",
-    eyebrow: "KOLEKCJA SEZONOWA",
-    title: "Boże Narodzenie",
-    copy: "Ciepłe, drewniane upominki tworzone specjalnie dla bliskich.",
-    image: "/images/album-detail.jpg",
-  },
-];
-
-const products = [
-  {
-    name: "Album wspomnień",
-    description: "Drewniana oprawa, wybrane imiona, data i tekst dedykacji.",
-    price: "od 890 NOK",
-    image: "/images/album-hero.png",
-    tag: "PERSONALIZOWANY",
-  },
-  {
-    name: "Pudełko na wyjątkową okazję",
-    description: "Projekt dopasowany do osoby, okazji i zawartości prezentu.",
-    price: "od 590 NOK",
-    image: "/images/gift-box.jpg",
-    tag: "NA ZAMÓWIENIE",
-  },
-  {
-    name: "Oprawa na fotografie",
-    description: "Warstwowa kompozycja z drewna z indywidualnym grawerem.",
-    price: "od 790 NOK",
-    image: "/images/album-detail.jpg",
-    tag: "PERSONALIZOWANY",
-  },
-];
+import { categories, products } from "../lib/catalog/data";
+import { localize, ui } from "../lib/catalog/i18n";
+import {
+  calculateCartTotal,
+  calculateProductTotal,
+  formatPrice,
+} from "../lib/pricing";
 
 function ArrowIcon() {
   return (
@@ -75,13 +28,104 @@ function BagIcon() {
 }
 
 export default function Home() {
+  const [locale, setLocale] = useState("no");
   const [activeCategory, setActiveCategory] = useState("sluby");
   const [personalizing, setPersonalizing] = useState(null);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [cartItems, setCartItems] = useState([]);
+  const [preview, setPreview] = useState({
+    svg: "",
+    loading: false,
+    metadata: null,
+    error: "",
+  });
+  const [form, setForm] = useState({
+    names: "",
+    occasionDate: "",
+    dedication: "",
+    dimensions: "",
+    express: false,
+    giftWrap: false,
+  });
 
   const active = useMemo(
     () => categories.find((category) => category.id === activeCategory),
     [activeCategory],
   );
+  const copy = ui[locale];
+
+  const filteredProducts = useMemo(
+    () => products.filter((product) => product.category === activeCategory),
+    [activeCategory],
+  );
+
+  const cartTotal = useMemo(() => calculateCartTotal(cartItems), [cartItems]);
+
+  useEffect(() => {
+    if (!personalizing) {
+      setPreview({ svg: "", loading: false, metadata: null, error: "" });
+      return;
+    }
+
+    const names = form.names.trim();
+    const dedication = form.dedication.trim();
+
+    if (!names || !dedication) {
+      setPreview({
+        svg: "",
+        loading: false,
+        metadata: null,
+        error: "missing_required_text",
+      });
+      return;
+    }
+
+    const controller = new AbortController();
+    setPreview((current) => ({ ...current, loading: true, error: "" }));
+
+    fetch("/api/render-preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        productId: personalizing.id,
+        values: {
+          names,
+          dedication,
+        },
+      }),
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("preview_failed");
+        }
+
+        return response.json();
+      })
+      .then((result) => {
+        setPreview({
+          svg: result.svg,
+          loading: false,
+          metadata: result.metadata,
+          error: "",
+        });
+      })
+      .catch((error) => {
+        if (error.name === "AbortError") {
+          return;
+        }
+
+        setPreview({
+          svg: "",
+          loading: false,
+          metadata: null,
+          error: "preview_failed",
+        });
+      });
+
+    return () => controller.abort();
+  }, [form.dedication, form.names, personalizing]);
 
   function openCategory(id) {
     setActiveCategory(id);
@@ -90,6 +134,53 @@ export default function Home() {
         .getElementById("collection")
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 20);
+  }
+
+  function openPersonalization(product) {
+    setPersonalizing(product);
+    setForm({
+      names: "",
+      occasionDate: "",
+      dedication: "",
+      dimensions: "",
+      express: false,
+      giftWrap: false,
+    });
+  }
+
+  function updateField(field, value) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function addToCart() {
+    if (!personalizing || !form.names.trim() || !form.dedication.trim()) {
+      return;
+    }
+
+    if (personalizing.requiresDimensions && !form.dimensions.trim()) {
+      return;
+    }
+
+    setCartItems((items) => [
+      ...items,
+      {
+        id: `${personalizing.id}-${Date.now()}`,
+        product: personalizing,
+        options: {
+          ...form,
+          names: form.names.trim(),
+          dedication: form.dedication.trim(),
+          occasionDate: form.occasionDate.trim(),
+          dimensions: form.dimensions.trim(),
+        },
+      },
+    ]);
+    setPersonalizing(null);
+    setCartOpen(true);
+  }
+
+  function removeCartItem(id) {
+    setCartItems((items) => items.filter((item) => item.id !== id));
   }
 
   return (
@@ -103,15 +194,54 @@ export default function Home() {
           </span>
         </a>
         <nav aria-label="Główna nawigacja">
-          <a href="#categories">Okazje</a>
-          <a href="#personalization">Personalizacja</a>
-          <a href="#about">O pracowni</a>
+          <a href="#categories">{copy.navOccasions}</a>
+          <a href="#personalization">{copy.navPersonalization}</a>
+          <a href="#about">{copy.navAbout}</a>
         </nav>
-        <button className="bag-button" type="button" aria-label="Koszyk">
-          <BagIcon />
-          <span>Koszyk</span>
-          <b>0</b>
-        </button>
+        <div className="header-actions">
+          <div className="language-switcher" aria-label="Language">
+            <button
+              className={locale === "no" ? "active" : ""}
+              onClick={() => setLocale("no")}
+              type="button"
+            >
+              NO
+            </button>
+            <button
+              className={locale === "pl" ? "active" : ""}
+              onClick={() => setLocale("pl")}
+              type="button"
+            >
+              PL
+            </button>
+          </div>
+          <button
+            className="menu-button"
+            type="button"
+            aria-expanded={menuOpen}
+            aria-controls="mobile-menu"
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {copy.menu}
+          </button>
+          <button
+            className="bag-button"
+            type="button"
+            aria-label="Koszyk"
+            onClick={() => setCartOpen(true)}
+          >
+            <BagIcon />
+            <span>{copy.cart}</span>
+            <b>{cartItems.length}</b>
+          </button>
+        </div>
+        {menuOpen && (
+          <div className="mobile-menu" id="mobile-menu">
+            <a href="#categories" onClick={() => setMenuOpen(false)}>{copy.navOccasions}</a>
+            <a href="#personalization" onClick={() => setMenuOpen(false)}>{copy.navPersonalization}</a>
+            <a href="#about" onClick={() => setMenuOpen(false)}>{copy.navAbout}</a>
+          </div>
+        )}
       </header>
 
       <section className="hero" id="top">
@@ -121,37 +251,30 @@ export default function Home() {
           alt="Personalizowany drewniany album Limes Dekor"
           fill
           priority
+          loading="eager"
           sizes="100vw"
         />
         <div className="hero-scrim" />
         <div className="hero-content">
-          <span className="eyebrow">RĘCZNIE TWORZONE · PERSONALIZOWANE</span>
-          <h1>Piękne chwile zasługują na osobistą oprawę.</h1>
-          <p>
-            Tworzę drewniane dekoracje i prezenty, które opowiadają Twoją
-            historię. Każdy projekt może otrzymać imię, datę lub własną
-            dedykację.
-          </p>
+          <span className="eyebrow">{copy.heroEyebrow}</span>
+          <h1>{copy.heroTitle}</h1>
+          <p>{copy.heroCopy}</p>
           <a className="primary-button" href="#categories">
-            Wybierz okazję
+            {copy.chooseOccasion}
             <ArrowIcon />
           </a>
         </div>
         <div className="hero-note">
           <span>01</span>
-          <p>Projekt powstaje dla Ciebie, nie z gotowego szablonu.</p>
+          <p>{copy.formRule}</p>
         </div>
       </section>
 
       <section className="occasion-section" id="categories">
         <div className="section-intro">
-          <span className="eyebrow">ZNAJDŹ DEKORACJĘ</span>
-          <h2>Od jakiej okazji zaczynamy?</h2>
-          <p>
-            Wybierz kolekcję. W środku znajdziesz bazowe projekty, które
-            dopasujemy do Twoich imion, daty, kolorystyki lub krótkiej
-            dedykacji.
-          </p>
+          <span className="eyebrow">{copy.categoriesEyebrow}</span>
+          <h2>{copy.categoriesTitle}</h2>
+          <p>{copy.categoriesCopy}</p>
         </div>
 
         <div className="occasion-grid">
@@ -171,11 +294,11 @@ export default function Home() {
               <span className="tile-scrim" />
               <span className="tile-number">0{index + 1}</span>
               <span className="tile-copy">
-                <small>{category.eyebrow}</small>
-                <strong>{category.title}</strong>
-                <span>{category.copy}</span>
+                <small>{localize(category.eyebrow, locale)}</small>
+                <strong>{localize(category.title, locale)}</strong>
+                <span>{localize(category.copy, locale)}</span>
                 <b>
-                  Zobacz kolekcję <ArrowIcon />
+                  {copy.seeCollection} <ArrowIcon />
                 </b>
               </span>
             </button>
@@ -186,10 +309,10 @@ export default function Home() {
       <section className="collection-section" id="collection">
         <div className="collection-header">
           <div>
-            <span className="eyebrow">{active.eyebrow}</span>
-            <h2>{active.title}</h2>
+            <span className="eyebrow">{localize(active.eyebrow, locale)}</span>
+            <h2>{localize(active.title, locale)}</h2>
           </div>
-          <div className="category-switcher" aria-label="Zmień kolekcję">
+          <div className="category-switcher" aria-label={copy.changeCollection}>
             {categories.map((category) => (
               <button
                 className={category.id === activeCategory ? "active" : ""}
@@ -197,37 +320,38 @@ export default function Home() {
                 onClick={() => setActiveCategory(category.id)}
                 type="button"
               >
-                {category.title}
+                {localize(category.title, locale)}
               </button>
             ))}
           </div>
         </div>
 
         <div className="product-grid">
-          {products.map((product) => (
-            <article className="product-card" key={product.name}>
+          {filteredProducts.map((product) => (
+            <article className="product-card" key={product.id}>
               <div className="product-image">
                 <Image
                   src={product.image}
-                  alt={product.name}
+                  alt={localize(product.name, locale)}
                   fill
                   sizes="(max-width: 800px) 100vw, 33vw"
                 />
-                <span>{product.tag}</span>
+                <span>{localize(product.tag, locale)}</span>
               </div>
               <div className="product-copy">
                 <div>
-                  <h3>{product.name}</h3>
-                  <p>{product.description}</p>
+                  <h3>{localize(product.name, locale)}</h3>
+                  <p>{localize(product.description, locale)}</p>
+                  <small>{copy.delivery}: {localize(product.delivery, locale)}</small>
                 </div>
-                <strong>{product.price}</strong>
+                <strong>{formatPrice(product.price)}</strong>
               </div>
               <button
                 className="product-action"
-                onClick={() => setPersonalizing(product)}
+                onClick={() => openPersonalization(product)}
                 type="button"
               >
-                Personalizuj projekt
+                {copy.personalize}
                 <ArrowIcon />
               </button>
             </article>
@@ -245,32 +369,29 @@ export default function Home() {
           />
         </div>
         <div className="personalization-copy">
-          <span className="eyebrow">TWÓJ POMYSŁ · MOJE WYKONANIE</span>
-          <h2>To nie jest zwykły produkt z półki.</h2>
-          <p className="lead">
-            Po wyborze wzoru podajesz treść, okazję i swoje życzenia. Przed
-            wykonaniem otrzymasz projekt do akceptacji.
-          </p>
+          <span className="eyebrow">{copy.personalizationEyebrow}</span>
+          <h2>{copy.personalizationTitle}</h2>
+          <p className="lead">{copy.personalizationLead}</p>
           <ol>
             <li>
               <b>01</b>
               <span>
-                <strong>Wybierz bazowy projekt</strong>
-                Zacznij od formy, która najlepiej pasuje do okazji.
+                <strong>{copy.step1Title}</strong>
+                {copy.step1Copy}
               </span>
             </li>
             <li>
               <b>02</b>
               <span>
-                <strong>Dodaj własne szczegóły</strong>
-                Wpisz imiona, datę, dedykację i wybierz wariant wykończenia.
+                <strong>{copy.step2Title}</strong>
+                {copy.step2Copy}
               </span>
             </li>
             <li>
               <b>03</b>
               <span>
-                <strong>Zaakceptuj wizualizację</strong>
-                Nic nie trafia do wykonania bez Twojej akceptacji.
+                <strong>{copy.step3Title}</strong>
+                {copy.step3Copy}
               </span>
             </li>
           </ol>
@@ -279,34 +400,31 @@ export default function Home() {
 
       <section className="payment-strip">
         <div>
-          <span className="eyebrow">PROSTO I BEZPIECZNIE</span>
-          <h2>Zapłać tak, jak Ci wygodnie.</h2>
+          <span className="eyebrow">{copy.paymentEyebrow}</span>
+          <h2>{copy.paymentTitle}</h2>
         </div>
         <div className="payment-methods">
           <span>Stripe</span>
           <span>Link</span>
           <span>Vipps</span>
-          <small>Płatności kartą i szybki checkout</small>
+          <small>{copy.paymentNote}</small>
         </div>
       </section>
 
       <footer id="about">
         <div>
           <span className="footer-logo">LIMES DEKOR</span>
-          <p>
-            Dziękuję za Twój czas i uwagę. Tworzę dekoracje, które zostają z
-            bliskimi na dłużej.
-          </p>
+          <p>{copy.footerCopy}</p>
         </div>
         <div>
-          <small>KONTAKT</small>
+          <small>{copy.contact}</small>
           <a href="mailto:studio@limes-interior.no">
             studio@limes-interior.no
           </a>
           <a href="tel:+4794712654">+47 947 12 654</a>
         </div>
         <div>
-          <small>PRACOWNIA</small>
+          <small>{copy.studio}</small>
           <p>Finnestadveien 371<br />1880 Eidsberg, Norway</p>
         </div>
       </footer>
@@ -327,37 +445,161 @@ export default function Home() {
             >
               ×
             </button>
-            <span className="eyebrow">PERSONALIZACJA</span>
-            <h2 id="personalization-title">{personalizing.name}</h2>
-            <p>
-              Wpisz dane, które mają pojawić się na projekcie. Ostateczny układ
-              wyślemy do akceptacji przed wykonaniem.
-            </p>
+            <span className="eyebrow">{copy.modalEyebrow}</span>
+            <h2 id="personalization-title">{localize(personalizing.name, locale)}</h2>
+            <p>{copy.modalCopy}</p>
             <label>
-              Imiona lub nazwa
-              <input placeholder="np. Anna i Tomasz" />
+              {copy.names}
+              <input
+                value={form.names}
+                onChange={(event) => updateField("names", event.target.value)}
+                placeholder={copy.namesPlaceholder}
+              />
             </label>
             <label>
-              Data lub okazja
-              <input placeholder="np. 14.08.2026" />
+              {copy.date}
+              <input
+                value={form.occasionDate}
+                onChange={(event) =>
+                  updateField("occasionDate", event.target.value)
+                }
+                placeholder={copy.datePlaceholder}
+              />
             </label>
             <label>
-              Dedykacja
+              {copy.dedication}
               <textarea
-                placeholder="Krótki tekst, który ma znaleźć się na dekoracji"
+                value={form.dedication}
+                onChange={(event) =>
+                  updateField("dedication", event.target.value)
+                }
+                placeholder={copy.dedicationPlaceholder}
                 rows="3"
               />
             </label>
-            <button className="primary-button full" type="button">
-              Dodaj projekt do zamówienia
+            {personalizing.requiresDimensions && (
+              <label>
+                {copy.dimensions}
+                <input
+                  value={form.dimensions}
+                  onChange={(event) =>
+                    updateField("dimensions", event.target.value)
+                  }
+                  placeholder={copy.dimensionsPlaceholder}
+                />
+              </label>
+            )}
+            <div className="production-preview">
+              <div className="preview-header">
+                <span>{copy.previewTitle}</span>
+                <small>
+                  {preview.loading
+                    ? copy.previewLoading
+                    : preview.metadata?.requiresReview
+                      ? copy.previewReview
+                      : preview.svg
+                        ? copy.previewReady
+                        : copy.previewMissing}
+                </small>
+              </div>
+              {preview.svg ? (
+                <div
+                  className="preview-canvas"
+                  dangerouslySetInnerHTML={{ __html: preview.svg }}
+                />
+              ) : (
+                <div className="preview-placeholder">
+                  {copy.previewPlaceholder}
+                </div>
+              )}
+              {preview.metadata?.requiresReview && (
+                <small className="preview-warning">
+                  {copy.previewReviewNote}
+                </small>
+              )}
+            </div>
+            <div className="paid-options">
+              <label>
+                <input
+                  checked={form.express}
+                  onChange={(event) =>
+                    updateField("express", event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                {copy.express} <span>+300 NOK</span>
+              </label>
+              <label>
+                <input
+                  checked={form.giftWrap}
+                  onChange={(event) =>
+                    updateField("giftWrap", event.target.checked)
+                  }
+                  type="checkbox"
+                />
+                {copy.giftWrap} <span>+90 NOK</span>
+              </label>
+            </div>
+            <div className="modal-summary">
+              <span>{copy.total}</span>
+              <strong>{formatPrice(calculateProductTotal(personalizing, form))}</strong>
+            </div>
+            <button className="primary-button full" onClick={addToCart} type="button">
+              {copy.addToCart}
               <ArrowIcon />
             </button>
-            <small className="modal-note">
-              Kwota zostanie pobrana przez Stripe Link lub Vipps dopiero przy
-              finalizacji zamówienia.
-            </small>
+            <small className="modal-note">{copy.modalNote}</small>
           </section>
         </div>
+      )}
+      {cartOpen && (
+        <aside className="cart-drawer" aria-label="Koszyk">
+          <button
+            className="modal-close"
+            onClick={() => setCartOpen(false)}
+            type="button"
+            aria-label="Zamknij koszyk"
+          >
+            ×
+          </button>
+          <span className="eyebrow">KOSZYK</span>
+          <h2>{copy.cartTitle}</h2>
+          {cartItems.length === 0 ? (
+            <p className="empty-cart">{copy.emptyCart}</p>
+          ) : (
+            <>
+              <div className="cart-items">
+                {cartItems.map((item) => (
+                  <article className="cart-item" key={item.id}>
+                    <div>
+                      <strong>{localize(item.product.name, locale)}</strong>
+                      <span>{item.options.names}</span>
+                      <small>{item.options.dedication}</small>
+                      {item.options.dimensions && (
+                        <small>{copy.dimensions}: {item.options.dimensions}</small>
+                      )}
+                    </div>
+                    <div>
+                      <b>{formatPrice(calculateProductTotal(item.product, item.options))}</b>
+                      <button type="button" onClick={() => removeCartItem(item.id)}>
+                        {copy.remove}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="cart-total">
+                <span>{copy.grossTotal}</span>
+                <strong>{formatPrice(cartTotal)}</strong>
+              </div>
+              <button className="primary-button full" type="button">
+                {copy.checkout}
+                <ArrowIcon />
+              </button>
+              <small className="modal-note">{copy.checkoutNote}</small>
+            </>
+          )}
+        </aside>
       )}
     </main>
   );
