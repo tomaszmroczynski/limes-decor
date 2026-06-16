@@ -1,11 +1,31 @@
 services:
   shop:
     image: ${IMAGE_REPOSITORY:-ghcr.io/tomaszmroczynski/limes-decor:latest}
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://limes:change-me@postgres:5432/limes_dekor?schema=public}
     ports:
       - "10000:3000"
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     labels:
       com.centurylinklabs.watchtower.enable: "true"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-limes_dekor}
+      POSTGRES_USER: ${POSTGRES_USER:-limes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
 
   watchtower:
     image: containrrr/watchtower:1.7.1
@@ -16,3 +36,6 @@ services:
       WATCHTOWER_POLL_INTERVAL: "300"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres_data:
