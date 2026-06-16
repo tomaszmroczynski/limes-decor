@@ -601,6 +601,71 @@ h2 {
   font-family: var(--font-ui);
 }
 
+.checkout-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.checkout-form label {
+  color: var(--text-secondary);
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.checkout-form input[type="email"],
+.checkout-form input[type="tel"] {
+  background: #2c2c2c;
+  border: 1px solid var(--line);
+  color: white;
+  display: block;
+  margin-top: 8px;
+  padding: 13px 15px;
+  width: 100%;
+}
+
+.checkout-form input[type="email"]:focus,
+.checkout-form input[type="tel"]:focus {
+  border-color: var(--brand-accent);
+  outline: 0;
+}
+
+.checkbox-row {
+  align-items: flex-start;
+  display: flex !important;
+  gap: 12px;
+  line-height: 1.5;
+}
+
+.checkbox-row input {
+  margin: 2px 0 0;
+}
+
+.checkbox-row span {
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+.checkout-feedback {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 14px;
+}
+
+.checkout-feedback.error {
+  color: #ffb3a8;
+}
+
+.checkout-feedback.success {
+  color: var(--brand-accent);
+}
+
 .cart-drawer {
   background: #202020;
   border-left: 1px solid var(--line);
@@ -812,6 +877,52 @@ footer small {
   font-size: 9px;
   letter-spacing: 2px;
   margin-bottom: 10px;
+}
+
+.checkout-result {
+  align-items: center;
+  background:
+    radial-gradient(circle at top, rgba(191, 156, 103, 0.18), transparent 40%),
+    var(--surface-deep);
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.checkout-result-card {
+  background: rgba(18, 16, 16, 0.95);
+  border: 1px solid var(--line);
+  max-width: 620px;
+  padding: 40px;
+  text-align: center;
+  width: 100%;
+}
+
+.checkout-result-card h1 {
+  font-size: clamp(34px, 5vw, 54px);
+  margin: 12px 0 18px;
+}
+
+.checkout-result-card p {
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin: 0 auto 18px;
+  max-width: 46ch;
+}
+
+.checkout-result-card strong {
+  color: var(--brand-accent);
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 26px;
+  text-transform: uppercase;
+}
+
+.checkout-result-card .primary-button {
+  display: inline-flex;
 }
 
 .modal-backdrop {

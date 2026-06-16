@@ -34,6 +34,19 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartItems, setCartItems] = useState([]);
+  const [checkoutForm, setCheckoutForm] = useState({
+    email: "",
+    phone: "",
+    consentTerms: false,
+    consentPrivacy: false,
+    consentNoReturn: false,
+    consentMarketing: false,
+  });
+  const [checkoutState, setCheckoutState] = useState({
+    loading: false,
+    error: "",
+    orderNo: "",
+  });
   const [preview, setPreview] = useState({
     svg: "",
     loading: false,
@@ -181,6 +194,87 @@ export default function Home() {
 
   function removeCartItem(id) {
     setCartItems((items) => items.filter((item) => item.id !== id));
+  }
+
+  function updateCheckoutField(field, value) {
+    setCheckoutForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function submitCheckout() {
+    if (
+      !checkoutForm.email.trim() ||
+      !checkoutForm.consentTerms ||
+      !checkoutForm.consentPrivacy ||
+      !checkoutForm.consentNoReturn
+    ) {
+      setCheckoutState({
+        loading: false,
+        error: copy.checkoutError,
+        orderNo: "",
+      });
+      return;
+    }
+
+    setCheckoutState({
+      loading: true,
+      error: "",
+      orderNo: "",
+    });
+
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          locale,
+          email: checkoutForm.email.trim(),
+          phone: checkoutForm.phone.trim(),
+          consents: {
+            terms: checkoutForm.consentTerms,
+            privacy: checkoutForm.consentPrivacy,
+            personalizedNoReturn: checkoutForm.consentNoReturn,
+            marketing: checkoutForm.consentMarketing,
+          },
+          items: cartItems.map((item) => ({
+            productId: item.product.id,
+            options: item.options,
+          })),
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        const errorMessage =
+          result.error === "database_not_configured"
+            ? copy.checkoutDbMissing
+            : copy.checkoutError;
+
+        setCheckoutState({
+          loading: false,
+          error: errorMessage,
+          orderNo: "",
+        });
+        return;
+      }
+
+      setCheckoutState({
+        loading: false,
+        error: "",
+        orderNo: result.orderNo,
+      });
+      setCartItems([]);
+
+      if (result.stripeUrl) {
+        window.location.href = result.stripeUrl;
+      }
+    } catch (_error) {
+      setCheckoutState({
+        loading: false,
+        error: copy.checkoutError,
+        orderNo: "",
+      });
+    }
   }
 
   return (
@@ -592,10 +686,89 @@ export default function Home() {
                 <span>{copy.grossTotal}</span>
                 <strong>{formatPrice(cartTotal)}</strong>
               </div>
-              <button className="primary-button full" type="button">
-                {copy.checkout}
+              <div className="checkout-form">
+                <label>
+                  {copy.email}
+                  <input
+                    type="email"
+                    value={checkoutForm.email}
+                    onChange={(event) =>
+                      updateCheckoutField("email", event.target.value)
+                    }
+                    placeholder={copy.emailPlaceholder}
+                  />
+                </label>
+                <label>
+                  {copy.phone}
+                  <input
+                    type="tel"
+                    value={checkoutForm.phone}
+                    onChange={(event) =>
+                      updateCheckoutField("phone", event.target.value)
+                    }
+                    placeholder={copy.phonePlaceholder}
+                  />
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={checkoutForm.consentTerms}
+                    onChange={(event) =>
+                      updateCheckoutField("consentTerms", event.target.checked)
+                    }
+                  />
+                  <span>{copy.consentTerms}</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={checkoutForm.consentPrivacy}
+                    onChange={(event) =>
+                      updateCheckoutField("consentPrivacy", event.target.checked)
+                    }
+                  />
+                  <span>{copy.consentPrivacy}</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={checkoutForm.consentNoReturn}
+                    onChange={(event) =>
+                      updateCheckoutField("consentNoReturn", event.target.checked)
+                    }
+                  />
+                  <span>{copy.consentNoReturn}</span>
+                </label>
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={checkoutForm.consentMarketing}
+                    onChange={(event) =>
+                      updateCheckoutField("consentMarketing", event.target.checked)
+                    }
+                  />
+                  <span>{copy.consentMarketing}</span>
+                </label>
+              </div>
+              <button
+                className="primary-button full"
+                type="button"
+                onClick={submitCheckout}
+                disabled={checkoutState.loading}
+              >
+                {checkoutState.loading ? copy.checkoutSaving : copy.checkout}
                 <ArrowIcon />
               </button>
+              {checkoutState.error && (
+                <small className="checkout-feedback error">
+                  {checkoutState.error}
+                </small>
+              )}
+              {checkoutState.orderNo && (
+                <small className="checkout-feedback success">
+                  {copy.orderSaved}: {copy.orderSavedNote} {checkoutState.orderNo}
+                </small>
+              )}
               <small className="modal-note">{copy.checkoutNote}</small>
             </>
           )}
