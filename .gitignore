@@ -2,6 +2,7 @@ node_modules
 .next
 .npm-cache
 .docker
+.gh-config
 tmp
 out
 .env*
