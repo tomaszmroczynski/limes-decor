@@ -12,6 +12,11 @@ export default async function CheckoutSuccessPage({ searchParams }) {
           po stronie systemu platnosci.
         </p>
         {orderNo && <strong>Numer zamowienia: {orderNo}</strong>}
+        {orderNo && (
+          <a className="secondary-link" href={`/order/${orderNo}`}>
+            Zobacz status zamowienia
+          </a>
+        )}
         <a className="primary-button" href="/">
           Wroc do strony glownej
         </a>
