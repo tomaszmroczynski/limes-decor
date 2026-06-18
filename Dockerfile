@@ -3,7 +3,7 @@ FROM node:20-alpine AS dependencies
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 FROM node:20-alpine AS builder
 
@@ -15,9 +15,10 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY package.json package-lock.json next.config.mjs ./
 COPY app ./app
 COPY lib ./lib
+COPY prisma ./prisma
 COPY public ./public
 
-RUN npm run build
+RUN npx prisma generate && npm run build
 
 FROM node:20-alpine AS runner
 
