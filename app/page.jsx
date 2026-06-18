@@ -27,6 +27,62 @@ function BagIcon() {
   );
 }
 
+function ProductCard({ product, locale, copy, onPersonalize }) {
+  const gallery =
+    product.images && product.images.length ? product.images : [product.image];
+  const [active, setActive] = useState(0);
+  const current = gallery[Math.min(active, gallery.length - 1)];
+  const name = localize(product.name, locale);
+
+  return (
+    <article className="product-card">
+      <div className="product-image">
+        <Image
+          src={current}
+          alt={name}
+          fill
+          sizes="(max-width: 800px) 100vw, 33vw"
+        />
+        <span>{localize(product.tag, locale)}</span>
+      </div>
+      {gallery.length > 1 && (
+        <div className="product-thumbs" role="group" aria-label={name}>
+          {gallery.map((src, index) => (
+            <button
+              className={index === active ? "active" : ""}
+              key={src}
+              onClick={() => setActive(index)}
+              type="button"
+              aria-current={index === active}
+              aria-label={`${name} — ${index + 1}`}
+            >
+              <Image src={src} alt="" fill sizes="80px" />
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="product-copy">
+        <div>
+          <h3>{name}</h3>
+          <p>{localize(product.description, locale)}</p>
+          <small>
+            {copy.delivery}: {localize(product.delivery, locale)}
+          </small>
+        </div>
+        <strong>{formatPrice(product.price)}</strong>
+      </div>
+      <button
+        className="product-action"
+        onClick={() => onPersonalize(product)}
+        type="button"
+      >
+        {copy.personalize}
+        <ArrowIcon />
+      </button>
+    </article>
+  );
+}
+
 export default function Home() {
   const [locale, setLocale] = useState("no");
   const [activeCategory, setActiveCategory] = useState("sluby");
@@ -69,7 +125,12 @@ export default function Home() {
   const copy = ui[locale];
 
   const filteredProducts = useMemo(
-    () => products.filter((product) => product.category === activeCategory),
+    () =>
+      products.filter((product) =>
+        product.categories
+          ? product.categories.includes(activeCategory)
+          : product.category === activeCategory,
+      ),
     [activeCategory],
   );
 
@@ -422,33 +483,13 @@ export default function Home() {
 
         <div className="product-grid">
           {filteredProducts.map((product) => (
-            <article className="product-card" key={product.id}>
-              <div className="product-image">
-                <Image
-                  src={product.image}
-                  alt={localize(product.name, locale)}
-                  fill
-                  sizes="(max-width: 800px) 100vw, 33vw"
-                />
-                <span>{localize(product.tag, locale)}</span>
-              </div>
-              <div className="product-copy">
-                <div>
-                  <h3>{localize(product.name, locale)}</h3>
-                  <p>{localize(product.description, locale)}</p>
-                  <small>{copy.delivery}: {localize(product.delivery, locale)}</small>
-                </div>
-                <strong>{formatPrice(product.price)}</strong>
-              </div>
-              <button
-                className="product-action"
-                onClick={() => openPersonalization(product)}
-                type="button"
-              >
-                {copy.personalize}
-                <ArrowIcon />
-              </button>
-            </article>
+            <ProductCard
+              key={product.id}
+              product={product}
+              locale={locale}
+              copy={copy}
+              onPersonalize={openPersonalization}
+            />
           ))}
         </div>
       </section>

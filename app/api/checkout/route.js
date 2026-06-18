@@ -121,7 +121,7 @@ export async function POST(request) {
             productId: item.product.id,
             productSnapshot: {
               id: item.product.id,
-              category: item.product.category,
+              category: item.product.categories?.[0] ?? item.product.category ?? null,
               name: item.product.name,
               image: item.product.image,
               price: item.product.price,

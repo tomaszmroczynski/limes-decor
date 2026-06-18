@@ -498,6 +498,37 @@ h2 {
   top: 0;
 }
 
+.product-thumbs {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.product-thumbs button {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  border: 1px solid var(--line);
+  background: var(--surface-panel);
+  cursor: pointer;
+  overflow: hidden;
+  padding: 0;
+  flex: 0 0 auto;
+  transition: border-color 0.25s ease;
+}
+
+.product-thumbs button:hover {
+  border-color: var(--text-secondary);
+}
+
+.product-thumbs button.active {
+  border-color: var(--brand-accent);
+}
+
+.product-thumbs img {
+  object-fit: cover;
+}
+
 .product-copy {
   display: flex;
   gap: 20px;
@@ -925,6 +956,37 @@ footer small {
   display: inline-flex;
 }
 
+.admin-login-card {
+  text-align: left;
+}
+
+.admin-login-label {
+  color: var(--text-secondary);
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 1px;
+  margin-top: 18px;
+}
+
+.admin-login-label span {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.admin-login-label input {
+  background: #2c2c2c;
+  border: 1px solid var(--line);
+  color: white;
+  padding: 13px 15px;
+  width: 100%;
+}
+
+.admin-login-label input:focus {
+  border-color: var(--brand-accent);
+  outline: 0;
+}
+
 .secondary-link {
   color: var(--text-secondary);
   display: inline-flex;
@@ -960,6 +1022,11 @@ footer small {
 
 .order-page-header h1 {
   margin: 14px 0 0;
+}
+
+.admin-session-note {
+  color: var(--text-secondary);
+  margin: 10px 0 0;
 }
 
 .order-badge {
@@ -1109,6 +1176,57 @@ footer small {
 .admin-order-grid p {
   color: var(--text-secondary);
   margin: 0;
+}
+
+.admin-header-actions {
+  align-items: flex-end;
+  display: flex;
+  gap: 12px;
+}
+
+.secondary-button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 1px;
+  padding: 10px 12px;
+  text-transform: uppercase;
+}
+
+.admin-order-actions {
+  align-items: end;
+  display: flex;
+  gap: 14px;
+  margin: 12px 0 10px;
+}
+
+.admin-order-actions label {
+  color: var(--text-secondary);
+  display: block;
+  flex: 1 1 auto;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  letter-spacing: 1px;
+}
+
+.admin-order-actions label span {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.admin-order-actions select {
+  background: #2c2c2c;
+  border: 1px solid var(--line);
+  color: white;
+  padding: 13px 15px;
+  width: 100%;
+}
+
+.admin-order-actions button.primary-button {
+  white-space: nowrap;
 }
 
 .modal-backdrop {
